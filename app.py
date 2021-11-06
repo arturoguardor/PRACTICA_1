@@ -2,7 +2,7 @@ from re import split
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_marshmallow import Marshmallow
-from datetime import date
+from datetime import datetime as date
 
 
 app = Flask(__name__)
@@ -14,28 +14,28 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
 
-today = date.today().strftime('%d/%m/%Y %H:%M:%S')
-today = today
+today = date.now().strftime('%d/%m/%Y %H:%M:%S')
 
-class products_table(db.Model):
+class Products_Table(db.Model):
 
     product_id = db.Column(db.Integer,primary_key=True)
-    product_name = db.Column(db.String(100))
+    products_name = db.Column(db.String(100))
     product_price = db.Column(db.Integer)
 
     #Constructor cada vez que se instancia la clase
     #Al recibir asignar los datos
-    def __init__(self, product_name, product_price):
+    def __init__(self, products_name, product_price):
 
-        self.product_name= product_name
+        self.products_name= products_name
         self.product_price= product_price
     #Modelo de Datos completado
 
-class orders_table(db.Model):
+class Orders_Table(db.Model):
 
     order_id = db.Column(db.Integer,primary_key=True)
     client_name = db.Column(db.String(100))
     order_date = db.Column(db.DateTime(100))
+    products_name = db.Column(db.String(100))
     no_product = db.Column(db.Integer)
     total_count = db.Column(db.Integer)
     client_addrs = db.Column(db.String(100))
@@ -49,15 +49,14 @@ class orders_table(db.Model):
     #Constructor cada vez que se instancia la clase
     #Al recibir asignar los datos
     def __init__(
-                 self, client_name, order_date, 
-                 no_product, total_count, 
-                 client_addrs, client_city, 
-                 client_phone, status_order,
-                 check_preparation, check_on_route,
-                 check_delivered):
+                 self, client_name, order_date, products_name,
+                 no_product, total_count, client_addrs,
+                 client_city, client_phone, status_order,
+                 check_preparation, check_on_route, check_delivered):
 
         self.client_name = client_name
         self.order_date = order_date
+        self.products_name = products_name
         self.no_product = no_product
         self.total_count = total_count
         self.client_addrs = client_addrs
@@ -74,37 +73,37 @@ db.create_all()
 
 class Products_Table_Schema(ma.Schema):
     class Meta:
-        fields = ('product_id ','product_name','product_price')
+        fields = ('product_id ','products_name','product_price')
 
 class Orders_Table_Schema(ma.Schema):
     class Meta:
         fields = (
                   'order_id ', 'client_name', 'order_date',
-                  'no_product', 'total_count', 'client_addrs'
-                  'client_city', 'client_phone', 'status_order',
-                  'check_preparation', 'check_on_route',
+                  'products_name', 'no_product', 'total_count',
+                  'client_addrs', 'client_city', 'client_phone',
+                  'status_order', 'check_preparation', 'check_on_route',
                   'check_delivered')
 
-products_table = Products_Table_Schema()
-products_table = Products_Table_Schema(many=True)
+product_table_schema = Products_Table_Schema()
+products_table_schema = Products_Table_Schema(many=True)
 
-orders_table = Orders_Table_Schema()
-orders_table = Orders_Table_Schema(many=True)
+order_table_schema = Orders_Table_Schema()
+orders_table_schema = Orders_Table_Schema(many=True)
 
 @app.route("/findoneorder/<id>",methods=["GET"])
 def get_categoria_x_id():
     try:
-        one_order = Orders_Table_Schema.query.get(id)
-        return orders_table.jsonify({
+        one_order = Orders_Table.query.get(id)
+        return orders_table_schema.jsonify({
                                     "code": 200,
                                     "data": one_order,
                                     "status": "ok",
                                     "message": "Orders Displayed",
                                     "time": today})
-    except Exception as Error:
+    except Exception:
         return jsonify({
                         "code": 500,
-                        "data": Error,
+                        "data": {},
                         "status_order": "error",
                         "message": "Read Error",
                         "time": today
@@ -116,18 +115,18 @@ def get_categoria_x_id():
 def findallorders():
     try:
         allorders = Orders_Table_Schema.query.all()
-        result = orders_table.dump(allorders)
+        result = orders_table_schema.dump(allorders)
 
-        return orders_table.jsonify({
+        return orders_table_schema.jsonify({
                                     "code": 200,
                                     "data": result,
                                     "status": "ok",
                                     "message": "Orders Displayed",
                                     "time": today})
-    except Exception as Error:
+    except Exception:
         return jsonify({
                         "code": 500,
-                        "data": Error,
+                        "data": {},
                         "status_order": "error",
                         "message": "Read Error",
                         "time": today
@@ -137,7 +136,7 @@ def findallorders():
 @app.route('/updateorder/<id>', methods=['PUT'])
 def update_order(order_id):
     try:
-        update_order = Orders_Table_Schema.query.get(order_id)
+        update_order = Orders_Table.query.get(order_id)
 
         data = request.get_json(force=True)
         status_order = data['status_order']
@@ -160,16 +159,16 @@ def update_order(order_id):
                         "message": "Bad Request",
                         "time": today})
 
-        return orders_table.jsonify({
+        return orders_table_schema.jsonify({
                                     "code": 200,
                                     "data": status_order,
                                     "status": "ok",
                                     "message": "Order Updated",
                                     "time": today})
-    except Exception as Error:
+    except Exception:
         return jsonify({
                         "code": 500,
-                        "data": Error,
+                        "data": {},
                         "status_order": "error",
                         "message": "Update Error",
                         "time": today})
@@ -180,41 +179,44 @@ def insert_order():
     try:
         data = request.get_json(force=True)
         client_name = data['client_name']
-        order_date = data['order_date']
-        no_product = data['no_product']
+        products_name = data['products_name']
         client_addrs = data['client_addrs']
         client_city = data['client_city']
         client_phone = data['client_phone']
-        status_order = data['status_order']
-        products_id = data['products_id']
-        total_count = 0
-        if len(products_id) > 1:
-            products_id = products_id.split(",")
-            for product_id in products_id:
-                product_id = product_id.strip()
-                product = Products_Table_Schema.query.get(product_id)
-                if product:
-                    total_count += product['product_price']
-                
 
-        new_order = Orders_Table_Schema(
-                                        client_name, order_date, no_product, 
-                                        total_count, client_addrs, client_city, 
-                                        client_phone, status_order)
+        order_date = today
+        total_count = 0
+
+        if products_name.count(",") >= 1:
+            products_name = products_name.split(",")
+            no_product = len(products_name)
+            for product in products_name:
+                products_name = product.strip()
+                product = Products_Table.query.get(products_name)
+                if product:
+                    total_count += int(product['product_price'])
+        else:
+            product = Products_Table.query.get(products_name)
+            total_count = int(product['product_price'])
+
+        new_order = Orders_Table(
+                                 client_name, order_date, products_name, 
+                                 no_product, total_count, client_addrs,
+                                 client_city, client_phone)
 
         db.session.add(new_order)
         db.session.commit()
 
-        return orders_table.jsonify({
-                                    "code": 200,
-                                    "data": new_order,
-                                    "status": "ok",
-                                    "message": "Order Created",
-                                    "time": today})
-    except Exception as Error:
+        return jsonify({
+                        "code": 200,
+                        "data": new_order,
+                        "status": "ok",
+                        "message": "Order Created",
+                        "time": today})
+    except Exception:
         return jsonify({
                         "code": 500,
-                        "data": Error,
+                        "data": {},
                         "status_order": "error",
                         "message": "Update Error",
                         "time": today})
@@ -224,24 +226,23 @@ def insert_order():
 def insert_food():
     try:
         data = request.get_json(force=True)
-        product_name = data["product_name"]
+        products_name = data["products_name"]
         product_price = data["product_price"]
 
-        new_food = Products_Table_Schema(product_name, product_price)
-
+        new_food = Products_Table(products_name, product_price)
         db.session.add(new_food)
         db.session.commit()
 
-        return orders_table.jsonify({
-                                    "code": 200,
-                                    "data": new_food,
-                                    "status": "ok",
-                                    "message": "Food Created",
-                                    "time": today})
-    except Exception as Error:
+        return jsonify({
+                        "code": 200,
+                        "data": new_food,
+                        "status": "ok",
+                        "message": "Food Created",
+                        "time": today})
+    except Exception:
         return jsonify({
                         "code": 500,
-                        "data": Error,
+                        "data": {},
                         "status_order": "error",
                         "message": "Update Error",
                         "time": today})
