@@ -19,14 +19,14 @@ today = date.now().strftime('%d/%m/%Y %H:%M:%S')
 class Products_Table(db.Model):
 
     product_id = db.Column(db.Integer,primary_key=True)
-    products_name = db.Column(db.String(100))
+    product_name = db.Column(db.String(100))
     product_price = db.Column(db.Integer)
 
     #Constructor cada vez que se instancia la clase
     #Al recibir asignar los datos
-    def __init__(self, products_name, product_price):
+    def __init__(self, product_name, product_price):
 
-        self.products_name= products_name
+        self.product_name= product_name
         self.product_price= product_price
     #Modelo de Datos completado
 
@@ -34,15 +34,15 @@ class Orders_Table(db.Model):
 
     order_id = db.Column(db.Integer,primary_key=True)
     client_name = db.Column(db.String(100))
-    order_date = db.Column(db.DateTime(100))
+    order_date = db.Column(db.String(100))
     products_name = db.Column(db.String(100))
     no_product = db.Column(db.Integer)
     total_count = db.Column(db.Integer)
     client_addrs = db.Column(db.String(100))
     client_city = db.Column(db.String(100))
     client_phone = db.Column(db.String(100))
-    status_order = db.Column(db.String(100), default="EN ESPERA")
-    check_preparation = db.Column(db.String(100), default=today)
+    status_order = db.Column(db.String(100))
+    check_preparation = db.Column(db.String(100))
     check_on_route = db.Column(db.String(100))
     check_delivered = db.Column(db.String(100))
 
@@ -73,7 +73,7 @@ db.create_all()
 
 class Products_Table_Schema(ma.Schema):
     class Meta:
-        fields = ('product_id ','products_name','product_price')
+        fields = ('product_id ','product_name','product_price')
 
 class Orders_Table_Schema(ma.Schema):
     class Meta:
@@ -90,16 +90,16 @@ products_table_schema = Products_Table_Schema(many=True)
 order_table_schema = Orders_Table_Schema()
 orders_table_schema = Orders_Table_Schema(many=True)
 
-@app.route("/findoneorder/<id>",methods=["GET"])
-def get_categoria_x_id():
+@app.route("/findoneorder/<order_id>",methods=["GET"])
+def get_categoria_x_id(order_id):
     try:
-        one_order = Orders_Table.query.get(id)
-        return orders_table_schema.jsonify({
-                                    "code": 200,
-                                    "data": one_order,
-                                    "status": "ok",
-                                    "message": "Orders Displayed",
-                                    "time": today})
+        one_order = Orders_Table.query.get(order_id)
+        return jsonify({
+                        "code": 200,
+                        "data": one_order.status_order,
+                        "status": "ok",
+                        "message": "Orders Displayed",
+                        "time": today})
     except Exception:
         return jsonify({
                         "code": 500,
@@ -117,12 +117,12 @@ def findallorders():
         allorders = Orders_Table_Schema.query.all()
         result = orders_table_schema.dump(allorders)
 
-        return orders_table_schema.jsonify({
-                                    "code": 200,
-                                    "data": result,
-                                    "status": "ok",
-                                    "message": "Orders Displayed",
-                                    "time": today})
+        return jsonify({
+                        "code": 200,
+                        "data": result.status_order,
+                        "status": "ok",
+                        "message": "Orders Displayed",
+                        "time": today})
     except Exception:
         return jsonify({
                         "code": 500,
@@ -133,7 +133,7 @@ def findallorders():
         })
 
 #Actualizar Estado del pedido
-@app.route('/updateorder/<id>', methods=['PUT'])
+@app.route('/updateorder/<order_id>', methods=['PUT'])
 def update_order(order_id):
     try:
         update_order = Orders_Table.query.get(order_id)
@@ -159,12 +159,14 @@ def update_order(order_id):
                         "message": "Bad Request",
                         "time": today})
 
-        return orders_table_schema.jsonify({
-                                    "code": 200,
-                                    "data": status_order,
-                                    "status": "ok",
-                                    "message": "Order Updated",
-                                    "time": today})
+        db.session.commit()
+        return jsonify({
+                        "code": 200,
+                        "data": status_order,
+                        "status": "ok",
+                        "message": "Order Updated",
+                        "time": today})
+    
     except Exception:
         return jsonify({
                         "code": 500,
@@ -186,30 +188,45 @@ def insert_order():
 
         order_date = today
         total_count = 0
-
         if products_name.count(",") >= 1:
             products_name = products_name.split(",")
             no_product = len(products_name)
-            for product in products_name:
+            for i, product in enumerate(products_name):
                 products_name = product.strip()
-                product = Products_Table.query.get(products_name)
-                if product:
-                    total_count += int(product['product_price'])
-        else:
-            product = Products_Table.query.get(products_name)
-            total_count = int(product['product_price'])
+                product = Products_Table.query.get(products_name[i])
+                if product.product_price:
+                    total_count += int(product.product_price)
+        elif products_name:
+            no_product = 1
+            product = Products_Table.query.filter(Products_Table.product_name == products_name).one()
+            total_count = product.product_price
 
+        else:
+            return jsonify({
+                        "code": 400,
+                        "data": {},
+                        "status_order": "error",
+                        "message": "Bad Request",
+                        "time": today})
+
+        status_order = "EN ESPERA"
+        check_preparation = ""
+        check_on_route = ""
+        check_delivered = ""
+              
         new_order = Orders_Table(
                                  client_name, order_date, products_name, 
                                  no_product, total_count, client_addrs,
-                                 client_city, client_phone)
+                                 client_city, client_phone, status_order,
+                                 check_preparation, check_on_route, check_delivered)
 
         db.session.add(new_order)
         db.session.commit()
 
         return jsonify({
                         "code": 200,
-                        "data": new_order,
+                        "order_id": new_order.order_id,
+                        "status_order": new_order.status_order,
                         "status": "ok",
                         "message": "Order Created",
                         "time": today})
@@ -218,7 +235,7 @@ def insert_order():
                         "code": 500,
                         "data": {},
                         "status_order": "error",
-                        "message": "Update Error",
+                        "message": "Order NOT Created",
                         "time": today})
 
 #Crear articulo (Comida)
@@ -226,16 +243,16 @@ def insert_order():
 def insert_food():
     try:
         data = request.get_json(force=True)
-        products_name = data["products_name"]
+        product_name = data["product_name"]
         product_price = data["product_price"]
 
-        new_food = Products_Table(products_name, product_price)
+        new_food = Products_Table(product_name, product_price)
         db.session.add(new_food)
         db.session.commit()
-
         return jsonify({
                         "code": 200,
-                        "data": new_food,
+                        "product_name": new_food.product_name,
+                        "product_price": new_food.product_price,
                         "status": "ok",
                         "message": "Food Created",
                         "time": today})
