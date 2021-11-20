@@ -1,6 +1,6 @@
 Practica #1
 
-Con el conocimiento adquirido, vamos a crear un reporsitorio (con tu cuenta de Bitbucket) llamado PRACTICA 1 y desarrollaremos el siguiente proyecto con cada uno de sus puntos en el lenguaje de nuestra preferencia:
+Con el conocimiento adquirido, vamos a crear un reporsitorio llamado Pedidos y desarrollaremos el siguiente proyecto con cada uno de sus puntos en el lenguaje de nuestra preferencia:
 
     Se debe crear un formulario donde se puedan crear los articulos (comida) que seran vendidos, debe contener, el nombre y el valor.
 
